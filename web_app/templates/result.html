@@ -46,10 +46,14 @@
                 <div class="card" style="width: 18rem;">
                     <img src="api/images?filename={{url}}" class="card-img-top" alt="...">
                     <div class="card-body">
-                      <h5 class="card-title">Happy</h5>
                       <a href="upload" class="btn btn-primary">Go Back</a>
                     </div>
                   </div>
+            </div>
+            <div>
+                {% block content %}
+                {{ predictions.to_html(classes="table table-striped", index=False) | safe}}
+                {% endblock %}
             </div>
           </main>
     </BODY>
