@@ -151,6 +151,16 @@ def aws_rekognition_classify(filename, df_predictions):
             confidence_value = emotion['Confidence']
             predicted_type = emotion['Type']
 
+    #convert response data similar to other models
+    if(predicted_type == 'CALM'):
+        predicted_type = 'NEUTRAL'
+    elif(predicted_type == 'DISGUSTED'):
+        predicted_type = 'DISGUST'
+    elif(predicted_type == 'SURPRISED'):
+        predicted_type = 'SURPRISE'
+        
+    predicted_type = predicted_type.capitalize()
+
     # save prediction to data frame
     df_predictions = df_predictions.append({'Model': 'Amazon Rekognition API', \
                                             'Predicted Emotion': predicted_type,\
