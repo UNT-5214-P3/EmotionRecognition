@@ -89,7 +89,7 @@ def display_result():
 
     df_predictions = cnn_pytorch_predict(filename, df_predictions)
     df_predictions = cnn_keras_predict(filename, df_predictions)
-    #df_predictions = aws_rekognition_classify(filename, df_predictions)
+    df_predictions = aws_rekognition_classify(filename, df_predictions)
     
     return render_template('result.html', url=filename, predictions=df_predictions)
 
