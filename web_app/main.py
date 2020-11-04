@@ -12,6 +12,7 @@ from keras.models import model_from_json
 from PIL import Image
 import torch
 import torchvision.transforms as transforms
+import boto3
 
 
 UPLOAD_FOLDER = './uploads'
@@ -84,10 +85,11 @@ def display_result():
     filename = request.args.get('filename')
 
     # build data frame that store result for image classification
-    df_predictions = pd.DataFrame(columns=['Model', 'Predicted Emotion', 'Probability/Score'])
+    df_predictions = pd.DataFrame(columns=['Model', 'Predicted Emotion', 'Probability'])
 
     df_predictions = cnn_pytorch_predict(filename, df_predictions)
     df_predictions = cnn_keras_predict(filename, df_predictions)
+    #df_predictions = aws_rekognition_classify(filename, df_predictions)
     
     return render_template('result.html', url=filename, predictions=df_predictions)
 
@@ -109,7 +111,7 @@ def cnn_keras_predict(filename, df_predictions):
     # save prediction to data frame
     df_predictions = df_predictions.append({'Model': 'CNN-VGG16 (keras)', \
                                             'Predicted Emotion': keras_predict,\
-                                            'Probability/Score': keras_predict_proba}, ignore_index=True)
+                                            'Probability': keras_predict_proba}, ignore_index=True)
     return df_predictions
 
 def cnn_pytorch_predict(filename, df_predictions):
@@ -119,11 +121,56 @@ def cnn_pytorch_predict(filename, df_predictions):
     outputs = net(image)
     _, predicted = torch.max(outputs, 1)
 
+    # get classification probability
+    sm = torch.nn.Softmax(dim=1)
+    prob = sm(outputs)
+
     # save prediction to data frame
     df_predictions = df_predictions.append({'Model': 'CNN-Resnet (pytorch)', \
                                             'Predicted Emotion': LABELS[predicted.item()],\
-                                            'Probability/Score': outputs[0][predicted.item()].item()}, ignore_index=True)
+                                            'Probability': '{:f}'.format(max(list(max(prob.data))))}, ignore_index=True)
     return df_predictions
+
+def aws_rekognition_classify(filename, df_predictions):
+
+    #initialize rekogniton client
+    rekognition = boto3.client('rekognition')
+
+    #invoke aws rekognition api
+    with open(os.path.join(app.config['UPLOAD_FOLDER'], filename), 'rb') as image_data:
+        response_content = image_data.read()
+        rekognition_response = rekognition.detect_faces(Image={'Bytes':response_content}, Attributes=['ALL'])
+    
+    #remove confused class
+    model_reponse_type_output = []
+    for class_type in rekognition_response['FaceDetails'][0]['Emotions']:
+        if class_type['Type'] != 'CONFUSED':
+            model_reponse_type_output.append(class_type)
+
+    #extract highest confidence emotion
+    predicted_type = ''
+    confidence_value = 0
+    for emotion in model_reponse_type_output:
+        if confidence_value <= emotion['Confidence']:
+            confidence_value = emotion['Confidence']
+            predicted_type = emotion['Type']
+
+    #convert response data similar to other models
+    if(predicted_type == 'CALM'):
+        predicted_type = 'NEUTRAL'
+    elif(predicted_type == 'DISGUSTED'):
+        predicted_type = 'DISGUST'
+    elif(predicted_type == 'SURPRISED'):
+        predicted_type = 'SURPRISE'
+        
+    predicted_type = predicted_type.capitalize()
+
+    # save prediction to data frame
+    df_predictions = df_predictions.append({'Model': 'Amazon Rekognition API', \
+                                            'Predicted Emotion': predicted_type,\
+                                            'Probability': confidence_value * 0.01}, ignore_index=True)
+    return df_predictions
+
 
 def image_loader(image_name):
     """load image, returns cuda tensor"""
