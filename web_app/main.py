@@ -121,10 +121,14 @@ def cnn_pytorch_predict(filename, df_predictions):
     outputs = net(image)
     _, predicted = torch.max(outputs, 1)
 
+    # get classification probability
+    sm = torch.nn.Softmax(dim=1)
+    prob = sm(outputs)
+
     # save prediction to data frame
     df_predictions = df_predictions.append({'Model': 'CNN-Resnet (pytorch)', \
                                             'Predicted Emotion': LABELS[predicted.item()],\
-                                            'Probability': outputs[0][predicted.item()].item()}, ignore_index=True)
+                                            'Probability': '{:f}'.format(max(list(max(prob.data))))}, ignore_index=True)
     return df_predictions
 
 def aws_rekognition_classify(filename, df_predictions):
